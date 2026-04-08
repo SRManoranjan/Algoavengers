@@ -1,0 +1,111 @@
+name: clinical-decisions-env
+version: "1.0.0"
+description: >
+  A healthcare clinical decision-making environment where an AI agent
+  acts as a virtual physician. The agent assesses patient cases, orders
+  diagnostic tests, interprets results, and prescribes treatments.
+  Reward is based on diagnostic accuracy, treatment appropriateness,
+  and patient safety — with partial credit for correct reasoning steps.
+
+author: clinical-openenv
+license: MIT
+
+observation_space:
+  type: object
+  description: Patient case state visible to the agent
+  properties:
+    patient_id:
+      type: string
+    chief_complaint:
+      type: string
+    vitals:
+      type: object
+      properties:
+        heart_rate: { type: integer, unit: bpm }
+        blood_pressure_systolic: { type: integer, unit: mmHg }
+        blood_pressure_diastolic: { type: integer, unit: mmHg }
+        temperature: { type: number, unit: celsius }
+        respiratory_rate: { type: integer, unit: breaths_per_min }
+        oxygen_saturation: { type: number, unit: percent }
+    history:
+      type: string
+      description: Patient medical history narrative
+    available_tests:
+      type: array
+      items: { type: string }
+      description: Tests the agent can order
+    test_results:
+      type: object
+      description: Results of ordered tests (populated after ordering)
+    current_step:
+      type: integer
+    max_steps:
+      type: integer
+    done:
+      type: boolean
+    reward_so_far:
+      type: number
+
+action_space:
+  type: object
+  description: >
+    A JSON string with one of these action types:
+      order_test   – Order a diagnostic test. { "action": "order_test", "test": "<test_name>" }
+      diagnose     – Submit a final diagnosis. { "action": "diagnose", "diagnosis": "<ICD code or plain text>" }
+      treat        – Prescribe treatment.      { "action": "treat", "treatment": "<treatment plan>" }
+      triage       – Set triage priority.      { "action": "triage", "priority": "emergent|urgent|non-urgent" }
+  properties:
+    action:
+      type: string
+      enum: [order_test, diagnose, treat, triage]
+    test:
+      type: string
+    diagnosis:
+      type: string
+    treatment:
+      type: string
+    priority:
+      type: string
+
+tasks:
+  - id: task_triage
+    name: Emergency Triage Classification
+    difficulty: easy
+    description: >
+      Given a patient's presenting symptoms and vitals, correctly classify
+      the triage priority (emergent, urgent, non-urgent). Partial credit
+      is given for ordering relevant tests before deciding.
+    max_steps: 5
+    reward_range: [0.0, 1.0]
+
+  - id: task_diagnosis
+    name: Differential Diagnosis
+    difficulty: medium
+    description: >
+      Work through a patient case by ordering appropriate tests and
+      arriving at a correct diagnosis. Scored on test selection efficiency
+      and diagnostic accuracy.
+    max_steps: 8
+    reward_range: [0.0, 1.0]
+
+  - id: task_treatment
+    name: Treatment Planning
+    difficulty: hard
+    description: >
+      Given a diagnosed condition, order confirmatory tests, assess
+      contraindications from patient history, and prescribe a safe and
+      effective treatment plan. Full marks require correct diagnosis +
+      safe treatment + no contraindicated medications.
+    max_steps: 10
+    reward_range: [0.0, 1.0]
+
+api:
+  reset: POST /reset
+  step:  POST /step
+  state: GET  /state
+  tasks: GET  /tasks
+  health: GET /health
+
+docker:
+  image: clinical-openenv:latest
+  port: 8000
